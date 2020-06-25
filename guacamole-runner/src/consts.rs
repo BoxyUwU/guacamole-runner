@@ -1,6 +1,8 @@
 pub mod textures {
     pub const FLOOR: &'static str = "hex-grass";
     pub const FLOOR_BRICK: &'static str = "hex-stone-floor";
+    pub const FLOOR_TILLED: &'static str = "tilled_floor";
+    pub const FLOOR_GROWN: &'static str = "grown_floor";
     pub const WALL: &'static str = "hex-dirt";
     pub const WALL_BRICK: &'static str = "hex-stone";
     pub const MARKER: &'static str = "marker";
@@ -29,7 +31,7 @@ pub const PLAYER_SPEED: f32 = 5.0;
 pub const MAX_FLOOR_HEIGHT: u8 = 2;
 pub const MAX_BRICK_HEIGHT: u8 = 4;
 
-pub const WIDTH: usize = 10000;
+pub const WIDTH: usize = 1000;
 pub const HEIGHT: usize = 10;
 
 pub const CLEAR_COL: crate::tetra::graphics::Color = crate::tetra::graphics::Color::rgb(0.392, 0.584, 0.929);

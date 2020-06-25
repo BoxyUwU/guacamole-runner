@@ -145,6 +145,7 @@ impl State<Res> for Game {
         self.world.run(systems::move_player);
         self.world.run(systems::platform_spawner);
         self.world.run(systems::move_planes);
+        self.world.run(systems::grow_ground);
 
         Ok(Trans::None)
     }

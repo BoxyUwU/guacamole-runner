@@ -11,6 +11,9 @@ use crate::{
         math::{
             Vec2,
         },
+        graphics::{
+            Camera,
+        },
     },
     consts::{
         *,
@@ -39,21 +42,25 @@ use vermarine_lib::{
 };
 
 pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut transforms: ViewMut<Transform>) {
-    let mut movement: Vec2<f32> = Vec2::new(0.0, 0.0);
+    let mut movement: Vec2<f32> = Vec2::zero();
 
-    for entry in [
-        (Key::Up, Vec2::new(0.0, -1.0)),
-        (Key::Down, Vec2::new(0.0, 1.0)),
-        (Key::Left, Vec2::new(-1.0, 0.0)),
-        (Key::Right, Vec2::new(1.0, 0.0)),
-    ].iter() {
-        if input::is_key_down(&ctx, entry.0) {
-            movement += entry.1;
+    if input::is_key_down(&ctx, Key::Down) {
+        movement += Vec2::new(-0.5, 2.);
+    }
+    if input::is_key_down(&ctx, Key::Up) {
+        movement += Vec2::new(-0.5, -2.);
+    }
+
+    if movement == Vec2::zero() {
+        if input::is_key_down(&ctx, Key::Right) {
+            movement += Vec2::new(1., 0.);
+        }
+        else if input::is_key_down(&ctx, Key::Left) {
+            movement += Vec2::new(-5., 0.);
         }
     }
 
     if movement != Vec2::new(0.0, 0.0) {
-        movement.normalize();
         movement *= PLAYER_SPEED;
         movement.x = movement.x.floor();
         movement.y = movement.y.floor();        
@@ -83,7 +90,7 @@ impl SpawnTimer {
     }
 }
 
-pub fn platform_spawner(mut all_storages: AllStoragesViewMut) {
+pub fn platform_spawner(all_storages: AllStoragesViewMut) {
     let spawn = all_storages.run(|mut spawn_timer: UniqueViewMut<SpawnTimer>| {
         if spawn_timer.cur <= 0 {
             spawn_timer.cur = spawn_timer.max;
@@ -98,7 +105,7 @@ pub fn platform_spawner(mut all_storages: AllStoragesViewMut) {
         use rand::prelude::*;
 
         let mut rng = rand::thread_rng();
-        let (x, mut y) = (rng.gen_range(1279, 1280), rng.gen_range(0, 2) * 720);
+        let (x, mut y) = (rng.gen_range(800, 1280), rng.gen_range(0, 2) * 720);
         let direction;
         let rotation;
         if y == 0 {
@@ -144,5 +151,41 @@ pub fn move_planes(mut transforms: ViewMut<Transform>, planes: View<Plane>) {
 
         transform.x += movement.x;
         transform.y += movement.y;
+    }
+}
+
+pub fn grow_ground(transforms: View<Transform>, players: View<Player>, mut map: UniqueViewMut<HexMap>) {
+    for (transform, _) in (&transforms, &players).iter() {
+        let mut pos = Vec2::new(transform.x as f32, transform.y as f32);
+        pos.y += 18. * 3.;
+        pos.x += 18. * 3.;
+
+        let adjacent = [
+            (0, 0),
+            (1, -1),
+            (1, 0),
+            (0, 1),
+            (-1, 1),
+            (-1, 0),
+            (0, -1),
+        ];
+
+        if let Some((q, r)) = map.pixel_to_hex(pos / 2.) {
+            for (q_mod, r_mod) in &adjacent {
+                let r = r + r_mod;
+                let q = q + q_mod;
+
+                if q >= WIDTH as i32 || q < 0 || r >= HEIGHT as i32 || r < 0 {
+                    continue;
+                }
+
+                if let Some(tile) = map.tiles.get_mut((r * WIDTH as i32 + q) as usize) {
+                    if tile.is_tilled {
+                        tile.is_grown = true;
+                    }
+                }
+            }
+        }
+        
     }
 }

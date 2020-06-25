@@ -33,6 +33,8 @@ use rand::rngs::StdRng;
 pub struct HexTileData {
     pub ground_height: u8,
     pub wall_height: u8,
+    pub is_tilled: bool,
+    pub is_grown: bool,
 }
 
 impl HexTileData {
@@ -40,6 +42,8 @@ impl HexTileData {
         HexTileData {
             ground_height: height,
             wall_height: height,
+            is_tilled: false,
+            is_grown: false,
         }
     }
 }
@@ -56,12 +60,31 @@ impl HexMap {
     pub fn new(width: usize, height: usize) -> Self {
         let mut rand = StdRng::seed_from_u64(100);
         let mut tiles = Vec::<HexTileData>::with_capacity(width * height);
+
         let mut tallest = 0;
         for _ in 0..width * height {
             let value = rand.gen_range(0, MAX_FLOOR_HEIGHT + 1);
-            tiles.push(HexTileData::new(value));
+            let tile = HexTileData::new(value);            
+            tiles.push(tile);
             if value > tallest {
                 tallest = value;
+            }
+        }
+
+        for _ in 0..5 {
+            for section in 0..(width / 10) {
+                let col = rand.gen_range(0, height + 1);
+                let mut total = 0;
+                for _ in 0..5 {
+                    total += rand.gen_range(3, 7 + 1);    
+                }
+                total /= 5;
+    
+                for offset in 0..total {
+                    if let Some(tile) = tiles.get_mut((col * width) + (section * 10) + offset) {
+                        tile.is_tilled = true;
+                    }
+                } 
             }
         }
 
@@ -85,8 +108,6 @@ impl HexMap {
     pub fn pixel_to_hex_raw(&mut self, pos: Vec2<f32>, height_offset: f32) -> (f32, f32) {
         let mut pos = pos;
         pos -= Vec2::new(18., 18.);
-        //pos.x -= self.position.x * FLOOR_WIDTH;
-        //pos.y -= self.position.y * FLOOR_VERT_STEP;
         pos.x -= self.position.x;
         pos.y -= self.position.y;
         pos.y += height_offset;
@@ -160,8 +181,6 @@ impl HexMap {
         let x = size_x * (f32::sqrt(3.0) * q + f32::sqrt(3.0) / 2.0 * r);
         let y = size_y * (3.0 / 2.0 * r);
         (
-            //x + 18. + self.position.x * FLOOR_WIDTH,
-            //y + 18. + self.position.y * FLOOR_VERT_STEP,
             x + 18. + self.position.x,
             y + 18. + self.position.y,
         )
@@ -185,8 +204,7 @@ pub fn offset_to_cube(off_x: i32, off_y: i32) -> (i32, i32, i32) {
     (x, y, z)
 }
 
-#[allow(dead_code)]
-fn cube_round(q: f32, r: f32, s: f32) -> (i32, i32, i32) {
+pub fn cube_round(q: f32, r: f32, s: f32) -> (i32, i32, i32) {
     let mut qi = q.round() as i32;
     let mut ri = r.round() as i32;
     let mut si = s.round() as i32;
@@ -221,13 +239,23 @@ pub fn render_hex_map(mut draw_buffer: UniqueViewMut<DrawBuffer>, drawables: Non
     let endy = (r + 20.0)
         .max(0.0).min(map.height as f32 - 1.0) as usize;
 
-    let (top_tex, wall_tex, brick_tex, brick_floor_tex) = (drawables.alias[textures::FLOOR], drawables.alias[textures::WALL], drawables.alias[textures::WALL_BRICK], drawables.alias[textures::FLOOR_BRICK]);
+    let (top_tex, wall_tex, brick_tex, brick_floor_tex, grown_tex, tilled_tex) = 
+        (
+            drawables.alias[textures::FLOOR], 
+            drawables.alias[textures::WALL], 
+            drawables.alias[textures::WALL_BRICK], 
+            drawables.alias[textures::FLOOR_BRICK],
+            drawables.alias[textures::FLOOR_GROWN],
+            drawables.alias[textures::FLOOR_TILLED],
+        );
 
     for height in 0..=MAX_BRICK_HEIGHT {
         let mut wall_buffer: Vec<DrawCommand> = Vec::with_capacity(1024);
         let mut wall_brick_buffer: Vec<DrawCommand> = Vec::with_capacity(1024);
         let mut top_buffer: Vec<DrawCommand> = Vec::with_capacity(1024);
         let mut top_brick_buffer: Vec<DrawCommand> = Vec::with_capacity(1024);
+        let mut top_tilled_buffer: Vec<DrawCommand> = Vec::with_capacity(1024);
+        let mut top_grown_buffer: Vec<DrawCommand> = Vec::with_capacity(1024);
         for y in starty..=endy {
             for x in startx..=endx {
                 let tile = &map.tiles[map.width * y + x];
@@ -246,8 +274,6 @@ pub fn render_hex_map(mut draw_buffer: UniqueViewMut<DrawBuffer>, drawables: Non
                 };
                 let (draw_x, draw_y) =
                     (
-                        //draw_x + map.position.x * FLOOR_WIDTH,
-                        //draw_y + map.position.y * FLOOR_VERT_STEP,
                         draw_x + map.position.x,
                         draw_y + map.position.y,
                     );
@@ -255,27 +281,21 @@ pub fn render_hex_map(mut draw_buffer: UniqueViewMut<DrawBuffer>, drawables: Non
                 if height <= tile.ground_height && height != 0 {
                     render_hex_walls(&mut wall_buffer, draw_x, draw_y, height, wall_tex);
                 }
-                if height > tile.ground_height && height <= tile.wall_height {
+                else if height > tile.ground_height && height <= tile.wall_height {
                     render_hex_bricks(&mut wall_brick_buffer, draw_x, draw_y, height, brick_tex);
                 }
 
-                /*let color = if let Some((sel_x, sel_y)) = selected_hex {
-                    let color = if x == sel_x as usize && y == sel_y as usize {
-                        Color::RED
-                    } else {
-                        Color::WHITE
-                    };
-                    color
-                } else {
-                    Color::WHITE
-                };*/
-                let color = Color::WHITE;
-
-                if height == tile.ground_height && height == tile.wall_height {
-                    render_hex_top(&mut top_buffer, draw_x, draw_y, tile.ground_height, top_tex, color);
+                if tile.is_grown && height == tile.ground_height {
+                    render_hex_top(&mut top_grown_buffer, draw_x, draw_y, tile.ground_height, grown_tex, Color::WHITE);
                 }
-                if height == tile.wall_height && height != tile.ground_height {
-                    render_hex_brick_top(&mut top_brick_buffer, draw_x, draw_y, tile.wall_height, brick_floor_tex, color);
+                else if tile.is_tilled && height == tile.ground_height {
+                    render_hex_top(&mut top_tilled_buffer, draw_x, draw_y, tile.ground_height, tilled_tex, Color::WHITE);
+                }
+                else if height == tile.ground_height && height == tile.wall_height {
+                    render_hex_top(&mut top_buffer, draw_x, draw_y, tile.ground_height, top_tex, Color::WHITE);
+                }
+                else if height == tile.wall_height && height != tile.ground_height {
+                    render_hex_brick_top(&mut top_brick_buffer, draw_x, draw_y, tile.wall_height, brick_floor_tex, Color::WHITE);
                 }
             }
         }
@@ -283,6 +303,8 @@ pub fn render_hex_map(mut draw_buffer: UniqueViewMut<DrawBuffer>, drawables: Non
         command_pool.commands.extend(&wall_brick_buffer);
         command_pool.commands.extend(&top_buffer);
         command_pool.commands.extend(&top_brick_buffer);
+        command_pool.commands.extend(&top_tilled_buffer);
+        command_pool.commands.extend(&top_grown_buffer);
     }
     
     // Draw dots at hex centers
@@ -302,7 +324,7 @@ pub fn render_hex_map(mut draw_buffer: UniqueViewMut<DrawBuffer>, drawables: Non
         }
     }*/
 
-    //draw_buffer.end_command_pool();
+    draw_buffer.end_command_pool();
 }
 
 pub fn render_hex_top(draw_buffer: &mut Vec<DrawCommand>, x: f32, y: f32, height: u8, texture: u64, color: Color) {
