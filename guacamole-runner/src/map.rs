@@ -6,17 +6,12 @@ use crate::{
         *,
     },
     tetra::{
-        Context,
         math::{
             Vec3,
             Vec2,
         },
         graphics::{
-            Camera,
             Color,
-        },
-        input::{
-            InputContext,
         },
     },
 };

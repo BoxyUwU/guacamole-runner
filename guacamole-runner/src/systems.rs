@@ -22,9 +22,18 @@ use crate::{
     map::{
         HexMap,
     },
+    components::{
+        Player,
+    },
 };
 
-pub fn move_camera(mut camera: UniqueViewMut<Camera>, input: UniqueView<InputContext>) {
+use vermarine_lib::{
+    components::{
+        Transform,
+    },
+};
+
+pub fn _move_camera(mut camera: UniqueViewMut<Camera>, input: UniqueView<InputContext>) {
     let mut movement: Vec2<f32> = Vec2::new(0.0, 0.0);
 
     for entry in [
@@ -47,7 +56,7 @@ pub fn move_camera(mut camera: UniqueViewMut<Camera>, input: UniqueView<InputCon
     }
 }
 
-pub fn update_hex_map(input_ctx: UniqueView<InputContext>, mut map: UniqueViewMut<HexMap>, camera: UniqueView<Camera>) {
+pub fn _update_hex_map(input_ctx: UniqueView<InputContext>, mut map: UniqueViewMut<HexMap>, camera: UniqueView<Camera>) {
     let (sel_x, sel_y) = 
         if let Some(hex) = map.pixel_to_hex(camera.mouse_position(&input_ctx)) {
             hex
@@ -82,6 +91,33 @@ pub fn update_hex_map(input_ctx: UniqueView<InputContext>, mut map: UniqueViewMu
     let height = tile.wall_height;
     if height > map.tallest {
         map.tallest = height;
+    }
+}
+
+pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut transforms: ViewMut<Transform>) {
+    let mut movement: Vec2<f32> = Vec2::new(0.0, 0.0);
+
+    for entry in [
+        (Key::Up, Vec2::new(0.0, -1.0)),
+        (Key::Down, Vec2::new(0.0, 1.0)),
+        (Key::Left, Vec2::new(-1.0, 0.0)),
+        (Key::Right, Vec2::new(1.0, 0.0)),
+    ].iter() {
+        if input::is_key_down(&ctx, entry.0) {
+            movement += entry.1;
+        }
+    }
+
+    if movement != Vec2::new(0.0, 0.0) {
+        movement.normalize();
+        movement *= CAM_SPEED;
+        movement.x = movement.x.floor();
+        movement.y = movement.y.floor();        
+    }
+
+    if let Some((_, transform)) = (&players, &mut transforms).iter().next() {
+        transform.x += movement.x as f64;
+        transform.y += movement.y as f64;
     }
 }
 

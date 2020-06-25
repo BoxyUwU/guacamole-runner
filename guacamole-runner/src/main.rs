@@ -1,6 +1,12 @@
 mod systems;
+#[allow(dead_code)]
 mod consts;
 mod map;
+mod components;
+
+use components::{
+    Player,
+};
 
 use map::{
     render_hex_map,
@@ -15,6 +21,11 @@ use vermarine_lib::{
         draw_buffer::{
             DrawBuffer,
         },
+        Drawables,
+        Sprite,
+    },
+    components::{
+        Transform,
     },
     tetra::{
         self,
@@ -27,7 +38,6 @@ use vermarine_lib::{
             self,
             Canvas,
             DrawParams,
-            Color,
         },
         input::{
             InputContext,
@@ -40,7 +50,7 @@ use vermarine_lib::{
     shipyard::{
         self,
         *,
-    }
+    },
 };
 
 type Res = ();
@@ -59,22 +69,36 @@ pub struct Game {
 
 impl Game {
     pub fn new(ctx: &mut Context) -> tetra::Result<Self> {
-        let mut world = World::new();
+        let world = World::new();
+        let mut game = Game {
+            world,
+            background_canvas: Canvas::new(ctx, 640, 360)
+                .expect("Could not make canvas"),
+        };
 
-        world.add_unique(map::HexMap::new(WIDTH, HEIGHT));
-        world.add_unique((*ctx.input_context()).clone());
-        world.add_unique(systems::CamScroller::new(0));
+        game.init_world(ctx);
 
-        world
+        Ok(game)
+    }
+
+    fn init_world(&mut self, ctx: &mut Context) {
+        self.world.add_unique(map::HexMap::new(WIDTH, HEIGHT));
+        self.world.add_unique((*ctx.input_context()).clone());
+        self.world.add_unique(systems::CamScroller::new(0));
+
+        self.world
             .add_rendering_workload(ctx)
             .with_rendering_systems()
             .build();
 
-        Ok(Game {
-            world,
-            background_canvas: Canvas::new(ctx, 640, 360)
-                .expect("Could not make canvas"),
-        })
+
+        let sprite = self.world.borrow::<NonSendSync<UniqueView<Drawables>>>().alias[textures::FLOOR_BRICK];
+        let _player = self.world
+            .entity_builder()
+            .with(Sprite::new(sprite))
+            .with(Transform::new(0., 0.))
+            .with(Player {})
+            .build();
     }
 
     fn draw_background(&mut self, ctx: &mut Context) {
@@ -103,8 +127,8 @@ impl State<Res> for Game {
             *ctx = (*input_ctx).clone();
         });
 
-        self.world.run(systems::move_camera);
         self.world.run(systems::scroll_map);
+        self.world.run(systems::move_player);
 
         Ok(Trans::None)
     }
