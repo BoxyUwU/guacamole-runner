@@ -4,13 +4,9 @@ use crate::{
     },
     tetra::{
         InputContext,
-        graphics::{
-            Camera,
-        },
         input::{
             self,
             Key,
-            MouseButton,
         },
         math::{
             Vec2,
@@ -24,6 +20,8 @@ use crate::{
     },
     components::{
         Player,
+        Plane,
+        Direction,
     },
 };
 
@@ -31,68 +29,14 @@ use vermarine_lib::{
     components::{
         Transform,
     },
+    rendering::{
+        Sprite,
+        Drawables,
+        draw_buffer::{
+            DrawCommand,
+        },
+    },
 };
-
-pub fn _move_camera(mut camera: UniqueViewMut<Camera>, input: UniqueView<InputContext>) {
-    let mut movement: Vec2<f32> = Vec2::new(0.0, 0.0);
-
-    for entry in [
-        (Key::Up, Vec2::new(0.0, -1.0)),
-        (Key::Down, Vec2::new(0.0, 1.0)),
-        (Key::Left, Vec2::new(-1.0, 0.0)),
-        (Key::Right, Vec2::new(1.0, 0.0)),
-    ].iter() {
-        if input::is_key_down(&input, entry.0) {
-            movement += entry.1;
-        }
-    }
-
-    if movement != Vec2::new(0.0, 0.0) {
-        movement.normalize();
-        movement *= CAM_SPEED;
-        movement.x = movement.x.floor();
-        movement.y = movement.y.floor();        
-        camera.position += movement;
-    }
-}
-
-pub fn _update_hex_map(input_ctx: UniqueView<InputContext>, mut map: UniqueViewMut<HexMap>, camera: UniqueView<Camera>) {
-    let (sel_x, sel_y) = 
-        if let Some(hex) = map.pixel_to_hex(camera.mouse_position(&input_ctx)) {
-            hex
-        } else {
-            return;
-        };
-    let (x, y) = (sel_x as usize, sel_y as usize);
-    
-    let map_width = map.width;
-    let tile = &mut map.tiles[y * map_width + x];
-
-    if input::is_mouse_button_pressed(&input_ctx, MouseButton::Left) {
-        if tile.ground_height > tile.wall_height && tile.ground_height > 0 {
-            tile.ground_height -= 1;
-        }
-        else if tile.wall_height > tile.ground_height && tile.wall_height > 0 {
-            tile.wall_height -= 1;
-        }
-        else if tile.wall_height == tile.ground_height && tile.wall_height > 0 {
-            tile.wall_height -= 1;
-            tile.ground_height -= 1;
-        }
-    } else if input::is_mouse_button_pressed(&input_ctx, MouseButton::Right) {
-        if tile.ground_height > tile.wall_height {
-            tile.wall_height = tile.ground_height + 1;
-        }
-        else if tile.wall_height >= tile.ground_height && tile.wall_height < MAX_BRICK_HEIGHT {
-            tile.wall_height += 1;
-        }
-    }
-
-    let height = tile.wall_height;
-    if height > map.tallest {
-        map.tallest = height;
-    }
-}
 
 pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut transforms: ViewMut<Transform>) {
     let mut movement: Vec2<f32> = Vec2::new(0.0, 0.0);
@@ -110,7 +54,7 @@ pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut tra
 
     if movement != Vec2::new(0.0, 0.0) {
         movement.normalize();
-        movement *= CAM_SPEED;
+        movement *= PLAYER_SPEED;
         movement.x = movement.x.floor();
         movement.y = movement.y.floor();        
     }
@@ -121,32 +65,84 @@ pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut tra
     }
 }
 
-pub struct CamScroller {
-    cur: i32,
-    max: i32,
-    stored: f32,
+pub fn scroll_map(mut map: UniqueViewMut<HexMap>) {
+    map.position.x -= SCROLL_RATE;
 }
 
-impl CamScroller {
+pub struct SpawnTimer {
+    cur: i32,
+    max: i32,
+}
+
+impl SpawnTimer {
     pub fn new(max: i32) -> Self {
         Self {
             cur: max,
             max,
-            stored: 0.,
         }
     }
 }
 
-pub fn scroll_map(mut scroller: UniqueViewMut<CamScroller>, mut map: UniqueViewMut<HexMap>) {
-    if scroller.cur <= 0 {
-        scroller.stored += SCROLL_RATE;
-        scroller.cur = scroller.max;
-    } else {
-        scroller.cur -= 1;
-    }
+pub fn platform_spawner(mut all_storages: AllStoragesViewMut) {
+    let spawn = all_storages.run(|mut spawn_timer: UniqueViewMut<SpawnTimer>| {
+        if spawn_timer.cur <= 0 {
+            spawn_timer.cur = spawn_timer.max;
+            true    
+        } else {
+            spawn_timer.cur -= 1;
+            false
+        }
+    });
 
-    while scroller.stored >= 1.0 {
-        scroller.stored -= 1.0;
-        map.position.x -= 1.0;
+    if spawn {
+        use rand::prelude::*;
+
+        let mut rng = rand::thread_rng();
+        let (x, mut y) = (rng.gen_range(1279, 1280), rng.gen_range(0, 2) * 720);
+        let direction;
+        let rotation;
+        if y == 0 {
+            y = -36;
+            direction = Direction::Down;
+            rotation = std::f32::consts::PI;
+        } else {
+            direction = Direction::Up;
+            rotation = 0.;
+            y += 36;
+        }
+
+        let tex = all_storages.run(|drawables: NonSendSync<UniqueView<Drawables>>| {
+            drawables.alias[textures::AEROPLANE]
+        });
+
+        all_storages
+            .entity_builder()
+            .with(Transform::new(x as f64, y as f64))
+            .with(Sprite::from_command(
+                DrawCommand::new(tex)
+                .scale(Vec2::new(2., 2.))
+                .draw_layer(draw_layers::PLANE)
+                .rotation(rotation)
+                .origin(Vec2::new(36., 36.))
+            ))
+            .with(Plane::new(direction))
+            .build();
+    }
+}
+
+pub fn move_planes(mut transforms: ViewMut<Transform>, planes: View<Plane>) {
+    for (transform, plane) in (&mut transforms, &planes).iter() {
+        let movement;
+        match plane.direction {
+            Direction::Up => {
+                movement = Vec2::new(-SCROLL_RATE as f64 * 2., -4.)
+            }
+            Direction::Down => {
+                movement = Vec2::new(-SCROLL_RATE as f64 * 2., 4.)
+            }
+        }
+
+        transform.x += movement.x;
+        transform.y += movement.y;
     }
 }

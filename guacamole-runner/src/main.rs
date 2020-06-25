@@ -85,20 +85,30 @@ impl Game {
     fn init_world(&mut self, ctx: &mut Context) {
         self.world.add_unique(map::HexMap::new(WIDTH, HEIGHT));
         self.world.add_unique((*ctx.input_context()).clone());
-        self.world.add_unique(systems::CamScroller::new(0));
+        self.world.add_unique(systems::SpawnTimer::new(60));
 
         self.world
             .add_rendering_workload(ctx)
             .with_rendering_systems()
             .build();
 
+        self.world.run(|mut camera: UniqueViewMut<Camera>| {
+            camera.position = Vec2::new(640., 360.);
+        });
 
-        let texture = self.world.borrow::<NonSendSync<UniqueView<Drawables>>>().alias[textures::PLAYER];
-        let _player = self.world
+        let (player_tex, _) = self.world.run(|drawables: NonSendSync<UniqueView<Drawables>>| {
+            (
+                drawables.alias[textures::PLAYER],
+                drawables.alias[textures::AEROPLANE],
+            )
+        });
+
+        self.world
             .entity_builder()
             .with(Sprite::from_command(
-                DrawCommand::new(texture)
+                DrawCommand::new(player_tex)
                 .scale(Vec2::new(3., 3.))
+                .draw_layer(draw_layers::PLAYER)
             ))
             .with(Transform::new(0., 0.))
             .with(Player {})
@@ -133,6 +143,8 @@ impl State<Res> for Game {
 
         self.world.run(systems::scroll_map);
         self.world.run(systems::move_player);
+        self.world.run(systems::platform_spawner);
+        self.world.run(systems::move_planes);
 
         Ok(Trans::None)
     }
