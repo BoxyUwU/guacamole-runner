@@ -20,6 +20,7 @@ use vermarine_lib::{
         RenderingWorkloadSystems,
         draw_buffer::{
             DrawBuffer,
+            DrawCommand,
         },
         Drawables,
         Sprite,
@@ -92,10 +93,13 @@ impl Game {
             .build();
 
 
-        let sprite = self.world.borrow::<NonSendSync<UniqueView<Drawables>>>().alias[textures::FLOOR_BRICK];
+        let texture = self.world.borrow::<NonSendSync<UniqueView<Drawables>>>().alias[textures::PLAYER];
         let _player = self.world
             .entity_builder()
-            .with(Sprite::new(sprite))
+            .with(Sprite::from_command(
+                DrawCommand::new(texture)
+                .scale(Vec2::new(3., 3.))
+            ))
             .with(Transform::new(0., 0.))
             .with(Player {})
             .build();

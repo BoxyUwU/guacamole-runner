@@ -4,6 +4,7 @@ pub mod textures {
     pub const WALL: &'static str = "hex-dirt";
     pub const WALL_BRICK: &'static str = "hex-stone";
     pub const MARKER: &'static str = "marker";
+    pub const PLAYER: &'static str = "player";
 }
 
 pub mod draw_layers {
