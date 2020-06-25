@@ -1,0 +1,10 @@
+[workspace]
+members = [ 
+    "guacamole-runner",
+]
+exclude = [
+    "vermarine-lib",
+]
+
+[profile.dev.package."*"]
+opt-level = 3
