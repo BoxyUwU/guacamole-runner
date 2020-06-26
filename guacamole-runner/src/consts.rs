@@ -37,3 +37,5 @@ pub const HEIGHT: usize = 10;
 pub const CLEAR_COL: crate::tetra::graphics::Color = crate::tetra::graphics::Color::rgb(0.392, 0.584, 0.929);
 
 pub const SCROLL_RATE: f32 = 4.;
+
+pub const FALL_SPEED: f32 = 0.01;

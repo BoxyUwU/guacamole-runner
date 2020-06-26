@@ -10,6 +10,7 @@ use crate::{
         },
         math::{
             Vec2,
+            Vec3,
         },
     },
     consts::{
@@ -22,6 +23,8 @@ use crate::{
         Player,
         Plane,
         Direction,
+        Collider,
+        Height,
     },
 };
 
@@ -86,7 +89,7 @@ pub struct SpawnTimer {
 impl SpawnTimer {
     pub fn new(max: i32) -> Self {
         Self {
-            cur: max,
+            cur: 0,
             max,
         }
     }
@@ -110,14 +113,17 @@ pub fn platform_spawner(all_storages: AllStoragesViewMut) {
         let (x, mut y) = (rng.gen_range(800, 1280), rng.gen_range(0, 2) * 720);
         let direction;
         let rotation;
+        let collider;
         if y == 0 {
             y = -36;
             direction = Direction::Down;
             rotation = std::f32::consts::PI;
+            collider = Collider::new(-32 * 2, -10 * 2, 64 * 2, 26 * 2);
         } else {
             direction = Direction::Up;
             rotation = 0.;
             y += 36;
+            collider = Collider::new(-32 * 2, -16 * 2, 64 * 2, 26 * 2);
         }
 
         let tex = all_storages.run(|drawables: NonSendSync<UniqueView<Drawables>>| {
@@ -135,6 +141,7 @@ pub fn platform_spawner(all_storages: AllStoragesViewMut) {
                 .origin(Vec2::new(36., 36.))
             ))
             .with(Plane::new(direction))
+            .with(collider)
             .build();
     }
 }
@@ -189,6 +196,20 @@ pub fn grow_ground(transforms: View<Transform>, players: View<Player>, mut map: 
                     tile.is_grown = true;
                 }
             }
+        }
+    }
+}
+
+use vermarine_lib::rendering::draw_buffer::DrawBuffer;
+pub fn player_platform_check(mut draw_buffer: UniqueViewMut<DrawBuffer>, drawables: NonSendSync<UniqueView<Drawables>>, player: View<Player>, transforms: View<Transform>, colliders: View<Collider>, mut heights: ViewMut<Height>) {
+    let (_, p_transform, p_collider, height) = (&player, &transforms, &colliders, &mut heights).iter().next().unwrap();
+    height.0 -= FALL_SPEED;
+    let (p_transform, p_collider) = ((*p_transform).clone(), (*p_collider).clone());
+
+    for (transform, collider, _) in (&transforms, &colliders, !&player).iter() {
+        if Collider::intersects(collider, transform, &p_collider, &p_transform) {
+            height.0 = 10.;
+            return;
         }
     }
 }

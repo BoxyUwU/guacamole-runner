@@ -6,6 +6,8 @@ mod components;
 
 use components::{
     Player,
+    Height,
+    Collider,
 };
 
 use map::{
@@ -35,16 +37,24 @@ use vermarine_lib::{
         Context,
         Trans,
         graphics::{
+            Color,
             Camera,
             self,
             Canvas,
             DrawParams,
+            text::{
+                Text,
+                Font,
+            }
         },
         input::{
+            self,
             InputContext,
+            Key,
         },
         math::{
             Vec2,
+            Vec3,
             Mat4,
         },
     },
@@ -112,6 +122,8 @@ impl Game {
             ))
             .with(Transform::new(0., 0.))
             .with(Player {})
+            .with(Collider::new(0, 9 * 3, 36 * 3, 20 * 3))
+            .with(Height(10.))
             .build();
     }
 
@@ -146,8 +158,18 @@ impl State<Res> for Game {
         self.world.run(systems::platform_spawner);
         self.world.run(systems::move_planes);
         self.world.run(systems::grow_ground);
+        self.world.run(systems::player_platform_check);
 
-        Ok(Trans::None)
+        let trans = self.world.run(|player: View<Player>, height: View<Height>| {
+            let (_, height) = (&player, &height).iter().next().unwrap();
+            if height.0 <= 8.5 {
+                Trans::Replace(Box::new(DeadState::new(ctx).unwrap()))
+            } else {
+                Trans::None
+            }
+        });
+
+        Ok(trans)
     }
 
     fn draw(&mut self, ctx: &mut Context, _res: &mut Res) -> tetra::Result {
@@ -174,5 +196,42 @@ impl State<Res> for Game {
         );
 
         Ok(())
+    }
+}
+
+
+struct DeadState {
+    text: Text,
+}
+
+impl State<Res> for DeadState {
+    fn update(&mut self, ctx: &mut Context, _resources: &mut Res) -> tetra::Result<tetra::Trans<Res>> {
+        if input::is_key_down(ctx.input_context(), Key::Space) {
+            return Ok(Trans::Switch(Box::new(Game::new(ctx)?)));
+        }
+
+        Ok(Trans::None)
+    }
+
+    fn draw(&mut self, ctx: &mut Context, _resources: &mut Res) -> tetra::Result {
+        graphics::clear(ctx, Color::rgb(0.45, 0.65, 1.0));
+        graphics::draw(ctx, &self.text, Vec2::new(550., 300.));
+
+        Ok(())
+    }
+}
+
+impl DeadState {
+    pub fn new(ctx: &mut Context) -> tetra::Result<Self> {
+        Ok(Self {
+            text: Text::new(
+                
+"
+         You died :<
+Press <SPACEBAR> to restart
+",
+                Font::vector(ctx, "./assets/DejaVuSansMono.ttf", 16.0)?
+            )
+        })
     }
 }
