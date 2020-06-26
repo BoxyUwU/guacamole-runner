@@ -69,3 +69,11 @@ impl Collider {
 
 #[derive(Debug)]
 pub struct Height(pub f32);
+
+pub struct Points(pub u32);
+
+impl Points {
+    pub fn new() -> Self {
+        Self(0)
+    }
+}

@@ -8,6 +8,7 @@ use components::{
     Player,
     Height,
     Collider,
+    Points,
 };
 
 use map::{
@@ -54,7 +55,6 @@ use vermarine_lib::{
         },
         math::{
             Vec2,
-            Vec3,
             Mat4,
         },
     },
@@ -76,15 +76,20 @@ fn main() -> tetra::Result {
 pub struct Game {
     world: World,
     background_canvas: Canvas,
+    text: Text,
 }
 
 impl Game {
     pub fn new(ctx: &mut Context) -> tetra::Result<Self> {
         let world = World::new();
+
+        let text = Text::new("", Font::vector(ctx, "./assets/DejaVuSansMono.ttf", 16.0).unwrap());
+
         let mut game = Game {
             world,
             background_canvas: Canvas::new(ctx, 640, 360)
                 .expect("Could not make canvas"),
+            text,
         };
 
         game.init_world(ctx);
@@ -95,7 +100,8 @@ impl Game {
     fn init_world(&mut self, ctx: &mut Context) {
         self.world.add_unique(map::HexMap::new(WIDTH, HEIGHT));
         self.world.add_unique((*ctx.input_context()).clone());
-        self.world.add_unique(systems::SpawnTimer::new(60));
+        self.world.add_unique(systems::SpawnTimer::new(70));
+        self.world.add_unique(Points::new());
 
         self.world
             .add_rendering_workload(ctx)
@@ -119,11 +125,12 @@ impl Game {
                 DrawCommand::new(player_tex)
                 .scale(Vec2::new(3., 3.))
                 .draw_layer(draw_layers::PLAYER)
+                .origin(Vec2::new(20., 18.))
             ))
             .with(Transform::new(0., 0.))
             .with(Player {})
-            .with(Collider::new(0, 9 * 3, 36 * 3, 20 * 3))
-            .with(Height(10.))
+            .with(Collider::new(-20 * 3, -8 * 3, 36 * 3, 16 * 3))
+            .with(Height(START_HEIGHT))
             .build();
     }
 
@@ -159,11 +166,12 @@ impl State<Res> for Game {
         self.world.run(systems::move_planes);
         self.world.run(systems::grow_ground);
         self.world.run(systems::player_platform_check);
+        self.world.run(systems::player_height_visualiser);
 
         let trans = self.world.run(|player: View<Player>, height: View<Height>| {
             let (_, height) = (&player, &height).iter().next().unwrap();
-            if height.0 <= 8.5 {
-                Trans::Replace(Box::new(DeadState::new(ctx).unwrap()))
+            if height.0 <= 0. {
+                Trans::Replace(Box::new(DeadState::new(ctx, self.world.borrow::<UniqueView<Points>>().0).unwrap()))
             } else {
                 Trans::None
             }
@@ -186,6 +194,11 @@ impl State<Res> for Game {
 
         self.world.run_workload("Rendering");
         self.world.run_with_data(DrawBuffer::flush, ctx);
+
+        self.world.run_with_data(|text: &mut Text, points: UniqueView<Points>| {
+            text.set_content(format!("Points: {}", points.0))
+        }, &mut self.text);
+        graphics::draw(ctx, &self.text, Vec2::new(40., 20.));
 
         tetra::window::set_title(
             ctx,
@@ -222,14 +235,15 @@ impl State<Res> for DeadState {
 }
 
 impl DeadState {
-    pub fn new(ctx: &mut Context) -> tetra::Result<Self> {
+    pub fn new(ctx: &mut Context, points: u32) -> tetra::Result<Self> {
         Ok(Self {
             text: Text::new(
-                
+
+format!(
 "
-         You died :<
+ You died with {} points
 Press <SPACEBAR> to restart
-",
+", points),
                 Font::vector(ctx, "./assets/DejaVuSansMono.ttf", 16.0)?
             )
         })

@@ -10,7 +10,6 @@ use crate::{
         },
         math::{
             Vec2,
-            Vec3,
         },
     },
     consts::{
@@ -25,6 +24,7 @@ use crate::{
         Direction,
         Collider,
         Height,
+        Points,
     },
 };
 
@@ -72,8 +72,8 @@ pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut tra
         transform.x += movement.x as f64;
         transform.y += movement.y as f64;
 
-        transform.x = transform.x.max(-8. + -72.).min(1240. - 62.);
-        transform.y = transform.y.max(-35.).min(647.);
+        transform.x = transform.x.max(-8. + -72. + (20. * 3.)).min(1240. - 62. + (20. * 3.));
+        transform.y = transform.y.max(-35. + (18. * 3.)).min(647. + (18. * 3.));
     }
 }
 
@@ -163,7 +163,7 @@ pub fn move_planes(mut transforms: ViewMut<Transform>, planes: View<Plane>) {
     }
 }
 
-pub fn grow_ground(transforms: View<Transform>, players: View<Player>, mut map: UniqueViewMut<HexMap>) {
+pub fn grow_ground(transforms: View<Transform>, players: View<Player>, mut map: UniqueViewMut<HexMap>, mut points: UniqueViewMut<Points>) {
     use crate::map::cube_round;
     for (transform, _) in (&transforms, &players).iter() {
         let mut pos = Vec2::new(transform.x as f32, transform.y as f32);
@@ -192,24 +192,35 @@ pub fn grow_ground(transforms: View<Transform>, players: View<Player>, mut map: 
             }
 
             if let Some(tile) = map.tiles.get_mut((r * WIDTH as i32 + q) as usize) {
-                if tile.is_tilled {
+                if tile.is_tilled && !tile.is_grown{
                     tile.is_grown = true;
+                    points.0 += POINTS_GROW;
                 }
             }
         }
     }
 }
 
-use vermarine_lib::rendering::draw_buffer::DrawBuffer;
-pub fn player_platform_check(mut draw_buffer: UniqueViewMut<DrawBuffer>, drawables: NonSendSync<UniqueView<Drawables>>, player: View<Player>, transforms: View<Transform>, colliders: View<Collider>, mut heights: ViewMut<Height>) {
+pub fn player_platform_check(player: View<Player>, transforms: View<Transform>, colliders: View<Collider>, mut heights: ViewMut<Height>) {
     let (_, p_transform, p_collider, height) = (&player, &transforms, &colliders, &mut heights).iter().next().unwrap();
     height.0 -= FALL_SPEED;
     let (p_transform, p_collider) = ((*p_transform).clone(), (*p_collider).clone());
 
     for (transform, collider, _) in (&transforms, &colliders, !&player).iter() {
         if Collider::intersects(collider, transform, &p_collider, &p_transform) {
-            height.0 = 10.;
+            height.0 = START_HEIGHT;
             return;
         }
     }
+}
+
+pub fn player_height_visualiser(player: View<Player>, height: View<Height>, mut sprite: ViewMut<Sprite>) {
+    let (_, height, sprite) = (&player, &height, &mut sprite).iter().next().unwrap();
+    let mut percent = height.0 / START_HEIGHT;
+    percent *= percent;
+    let start = 1.;
+    let end = 3.;
+    let offset = percent * (end - start);
+    let lerped = start + offset;
+    sprite.0.scale = Vec2::new(lerped, lerped);
 }

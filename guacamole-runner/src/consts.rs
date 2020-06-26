@@ -31,7 +31,7 @@ pub const PLAYER_SPEED: f32 = 5.0;
 pub const MAX_FLOOR_HEIGHT: u8 = 2;
 pub const MAX_BRICK_HEIGHT: u8 = 4;
 
-pub const WIDTH: usize = 1000;
+pub const WIDTH: usize = 100000;
 pub const HEIGHT: usize = 10;
 
 pub const CLEAR_COL: crate::tetra::graphics::Color = crate::tetra::graphics::Color::rgb(0.392, 0.584, 0.929);
@@ -39,3 +39,6 @@ pub const CLEAR_COL: crate::tetra::graphics::Color = crate::tetra::graphics::Col
 pub const SCROLL_RATE: f32 = 4.;
 
 pub const FALL_SPEED: f32 = 0.01;
+pub const START_HEIGHT: f32 = 1.5;
+
+pub const POINTS_GROW: u32 = 1;
