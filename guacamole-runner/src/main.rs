@@ -241,7 +241,7 @@ impl DeadState {
 
 format!(
 "
- You died with {} points
+ You landed with {} points
 Press <SPACEBAR> to restart
 ", points),
                 Font::vector(ctx, "./assets/DejaVuSansMono.ttf", 16.0)?
