@@ -11,9 +11,6 @@ use crate::{
         math::{
             Vec2,
         },
-        graphics::{
-            Camera,
-        },
     },
     consts::{
         *,
@@ -52,12 +49,14 @@ pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut tra
     }
 
     if movement == Vec2::zero() {
-        if input::is_key_down(&ctx, Key::Right) {
-            movement += Vec2::new(1., 0.);
-        }
-        else if input::is_key_down(&ctx, Key::Left) {
+        if input::is_key_down(&ctx, Key::Left) {
             movement += Vec2::new(-5., 0.);
         }
+        else if input::is_key_down(&ctx, Key::Right) {
+            movement += Vec2::new(1., 0.);
+        }
+    } else if input::is_key_down(&ctx, Key::Left) {
+        movement = Vec2::new(-5., 0.);
     }
 
     if movement != Vec2::new(0.0, 0.0) {
@@ -69,6 +68,9 @@ pub fn move_player(ctx: UniqueView<InputContext>, players: View<Player>, mut tra
     if let Some((_, transform)) = (&players, &mut transforms).iter().next() {
         transform.x += movement.x as f64;
         transform.y += movement.y as f64;
+
+        transform.x = transform.x.max(-8. + -72.).min(1240. - 62.);
+        transform.y = transform.y.max(-35.).min(647.);
     }
 }
 
@@ -155,6 +157,7 @@ pub fn move_planes(mut transforms: ViewMut<Transform>, planes: View<Plane>) {
 }
 
 pub fn grow_ground(transforms: View<Transform>, players: View<Player>, mut map: UniqueViewMut<HexMap>) {
+    use crate::map::cube_round;
     for (transform, _) in (&transforms, &players).iter() {
         let mut pos = Vec2::new(transform.x as f32, transform.y as f32);
         pos.y += 18. * 3.;
@@ -170,22 +173,22 @@ pub fn grow_ground(transforms: View<Transform>, players: View<Player>, mut map: 
             (0, -1),
         ];
 
-        if let Some((q, r)) = map.pixel_to_hex(pos / 2.) {
-            for (q_mod, r_mod) in &adjacent {
-                let r = r + r_mod;
-                let q = q + q_mod;
+        let (q, r) = map.pixel_to_hex_raw(pos / 2., 0.);
+        let (q, r, _) = cube_round(q, r, -r - q);        
 
-                if q >= WIDTH as i32 || q < 0 || r >= HEIGHT as i32 || r < 0 {
-                    continue;
-                }
+        for (q_mod, r_mod) in &adjacent {
+            let r = r + r_mod;
+            let q = q + q_mod;
 
-                if let Some(tile) = map.tiles.get_mut((r * WIDTH as i32 + q) as usize) {
-                    if tile.is_tilled {
-                        tile.is_grown = true;
-                    }
+            if q >= WIDTH as i32 || q < 0 || r >= HEIGHT as i32 || r < 0 {
+                continue;
+            }
+
+            if let Some(tile) = map.tiles.get_mut((r * WIDTH as i32 + q) as usize) {
+                if tile.is_tilled {
+                    tile.is_grown = true;
                 }
             }
         }
-        
     }
 }
