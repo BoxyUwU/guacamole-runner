@@ -127,7 +127,7 @@ impl Game {
                 .draw_layer(draw_layers::PLAYER)
                 .origin(Vec2::new(20., 18.))
             ))
-            .with(Transform::new(0., 0.))
+            .with(Transform::new(200., 360.))
             .with(Player {})
             .with(Collider::new(-20 * 3, -8 * 3, 36 * 3, 16 * 3))
             .with(Height(START_HEIGHT))
