@@ -35,9 +35,7 @@ use vermarine_lib::{
     tetra::{
         self,
         ContextBuilder,
-        State,
         Context,
-        Trans,
         graphics::{
             Color,
             Camera,
@@ -63,6 +61,11 @@ use vermarine_lib::{
         self,
         *,
     },
+    pushdown_automaton_state::{
+        PushdownAutomaton,
+        PDAState,
+        Trans,
+    },
 };
 
 type Res = ();
@@ -71,7 +74,7 @@ fn main() -> tetra::Result {
     ContextBuilder::new("Guacamole-Runner", 1280, 720)
         .show_mouse(true)
         .build()?
-        .run(Game::new, |_| Ok(()))
+        .run(|ctx| PushdownAutomaton::new(ctx, Game::new, |_| Ok(())))
 }
 
 pub struct Game {
@@ -81,7 +84,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(ctx: &mut Context) -> tetra::Result<Self> {
+    pub fn new(ctx: &mut Context, _: &mut Res) -> tetra::Result<Self> {
         let world = World::new();
 
         let text = Text::new("", Font::vector(ctx, "./assets/DejaVuSansMono.ttf", 16.0).unwrap());
@@ -103,6 +106,7 @@ impl Game {
         self.world.add_unique((*ctx.input_context()).clone());
         self.world.add_unique(systems::SpawnTimer::new(70));
         self.world.add_unique(Points::new());
+        self.world.add_unique_non_send_sync(Drawables::new(ctx).unwrap());
 
         self.world
             .add_rendering_workload(ctx)
@@ -154,7 +158,7 @@ impl Game {
     }
 }
 
-impl State<Res> for Game {
+impl PDAState<Res> for Game {
     fn update(&mut self, ctx: &mut Context, _res: &mut Res) -> tetra::Result<Trans<Res>> {
         let input_ctx = ctx.input_context();
         self.world.run(|mut ctx: UniqueViewMut<InputContext>| {
@@ -223,10 +227,10 @@ struct DeadState {
     text: Text,
 }
 
-impl State<Res> for DeadState {
-    fn update(&mut self, ctx: &mut Context, _resources: &mut Res) -> tetra::Result<tetra::Trans<Res>> {
+impl PDAState<Res> for DeadState {
+    fn update(&mut self, ctx: &mut Context, res: &mut Res) -> tetra::Result<Trans<Res>> {
         if input::is_key_down(ctx.input_context(), Key::Space) {
-            return Ok(Trans::Switch(Box::new(Game::new(ctx)?)));
+            return Ok(Trans::Switch(Box::new(Game::new(ctx, res)?)));
         }
 
         Ok(Trans::None)
