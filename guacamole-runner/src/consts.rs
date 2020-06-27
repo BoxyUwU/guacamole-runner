@@ -39,6 +39,6 @@ pub const CLEAR_COL: crate::tetra::graphics::Color = crate::tetra::graphics::Col
 pub const SCROLL_RATE: f32 = 4.;
 
 pub const FALL_SPEED: f32 = 0.01;
-pub const START_HEIGHT: f32 = 1.5;
+pub const START_HEIGHT: f32 = 1.0;
 
 pub const POINTS_GROW: u32 = 1;

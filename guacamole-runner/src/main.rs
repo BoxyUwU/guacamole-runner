@@ -13,6 +13,7 @@ use components::{
 
 use map::{
     render_hex_map,
+    HexMap,
 };
 
 use consts::*;
@@ -171,7 +172,12 @@ impl State<Res> for Game {
         let trans = self.world.run(|player: View<Player>, height: View<Height>| {
             let (_, height) = (&player, &height).iter().next().unwrap();
             if height.0 <= 0. {
-                Trans::Replace(Box::new(DeadState::new(ctx, self.world.borrow::<UniqueView<Points>>().0).unwrap()))
+                let trans = self.world.run(|points: UniqueView<Points>, map: UniqueView<HexMap>| {
+                    let x = -map.position.x / FLOOR_WIDTH;
+                    let trans = Trans::Replace(Box::new(DeadState::new(ctx, points.0, x as u32).unwrap()));
+                    trans
+                });
+                trans
             } else {
                 Trans::None
             }
@@ -228,22 +234,22 @@ impl State<Res> for DeadState {
 
     fn draw(&mut self, ctx: &mut Context, _resources: &mut Res) -> tetra::Result {
         graphics::clear(ctx, Color::rgb(0.45, 0.65, 1.0));
-        graphics::draw(ctx, &self.text, Vec2::new(550., 300.));
+        graphics::draw(ctx, &self.text, Vec2::new(400., 300.));
 
         Ok(())
     }
 }
 
 impl DeadState {
-    pub fn new(ctx: &mut Context, points: u32) -> tetra::Result<Self> {
+    pub fn new(ctx: &mut Context, points: u32, distance: u32) -> tetra::Result<Self> {
         Ok(Self {
             text: Text::new(
 
 format!(
 "
- You landed with {} points
-Press <SPACEBAR> to restart
-", points),
+ You landed with {} points with a distance of {}
+        Press <SPACEBAR> to restart
+", points, distance),
                 Font::vector(ctx, "./assets/DejaVuSansMono.ttf", 16.0)?
             )
         })

@@ -58,7 +58,7 @@ pub struct HexMap {
 
 impl HexMap {
     pub fn new(width: usize, height: usize) -> Self {
-        let mut rand = StdRng::seed_from_u64(100);
+        let mut rand = StdRng::from_entropy();
         let mut tiles = Vec::<HexTileData>::with_capacity(width * height);
 
         let mut tallest = 0;
